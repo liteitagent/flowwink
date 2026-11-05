@@ -31,7 +31,7 @@ describe('the agent paths', () => {
   const names = (reportsModule.skillSeeds ?? []).map((s) => s.name);
 
   it('publish, list, read, versions and details — and nothing that takes away', () => {
-    expect(names.sort()).toEqual(['get_report', 'list_report_versions', 'list_reports', 'publish_overview_dashboard', 'publish_report', 'update_report_details']);
+    expect(names.sort()).toEqual(['get_report', 'list_report_versions', 'list_reports', 'publish_month_close_report', 'publish_overview_dashboard', 'publish_report', 'publish_weekly_digest', 'update_report_details']);
     expect(names.some((n) => /archive|restore|delete|rename/.test(n))).toBe(false);
     for (const s of reportsModule.skillSeeds ?? []) expect(s.handler).toBe('internal:reports');
   });
@@ -119,6 +119,18 @@ From accounting_reports.
 
 ::note
 never closed`;
+
+  it('a pie: one slice per row, the first series its size; the reader draws it', () => {
+    const segs = parseReport('```chart pie title="Cost by kind"\nKind, Share\nTransport, 610000\nStorage, 170000\n```');
+    expect(segs[0]).toMatchObject({ kind: 'chart', type: 'pie', title: 'Cost by kind', axis: 'Kind', series: ['Share'] });
+    expect((segs[0] as { rows: unknown[] }).rows).toEqual([{ Kind: 'Transport', Share: 610000 }, { Kind: 'Storage', Share: 170000 }]);
+    expect(validateLiveSpec({ skill: 'check_books', chart: { type: 'pie', rows: 'r', axis: 'a', series: ['s'] } }).errors).toEqual([]);
+    expect(validateLiveSpec({ skill: 'check_books', chart: { type: 'donut', rows: 'r', axis: 'a', series: ['s'] } }).errors.join()).toMatch(/bar \| stacked \| line \| pie/);
+    const body = readFileSync('src/components/admin/reports/ReportBody.tsx', 'utf8');
+    expect(body).toMatch(/type === 'pie'[\s\S]*<PieChart>[\s\S]*nameKey=\{axis\}/);
+    // The skill says charts exist before the guide is read (Law 2).
+    expect(reportsModule.skillSeeds.find((x) => x.name === 'publish_report')?.description).toMatch(/bar \/ stacked \/ line \/ pie charts/);
+  });
 
   it('parses kpis, notes, charts and details; an unclosed block stays text', () => {
     const segs = parseReport(src);

@@ -193,7 +193,7 @@ component map, ownership ruling, and the Trace/resumption build plan:
 
 ### MCP Server (external agent access)
 
-`mcp-server` exposes FlowWink skills to external agents. It runs on Supabase Edge Functions, so the transport is **Streamable HTTP** (not stdio — there is no long-lived local process). This is a consequence of serverless deployment, not Deno. **Its address is the site's own `/mcp`** (`api/mcp.ts` on Vercel proxies `/mcp` and every subpath to the function, query and headers intact, streaming, 60 s window; `nginx.conf` carries the stub for Docker) — the shape every other integration uses (`mcp.stripe.com`, `mcp.linear.app/mcp`); `mcp.<domain>` is one more domain on the same project. The functions URL stays valid and is what the admin shows when the deployment does not answer on `/mcp` (`useMcpAddress` probes the `X-FlowWink-MCP` header).
+`mcp-server` exposes FlowWink skills to external agents. It runs on Supabase Edge Functions, so the transport is **Streamable HTTP** (not stdio — there is no long-lived local process). This is a consequence of serverless deployment, not Deno. **Its address is the site's own `/mcp`** (`api/mcp.ts` on Vercel proxies `/mcp` and every subpath to the function, query and headers intact, streaming, 60 s window; `nginx.conf` carries the stub for Docker) — the shape every other integration uses (`mcp.stripe.com`, `mcp.linear.app/mcp`); `mcp.<domain>` is one more domain on the same project. The functions URL stays valid and is what the admin shows when the deployment does not answer on `/mcp` (`useMcpAddress` probes with a real `initialize` — `src/lib/mcp-probe.ts`, judged on the decoded body, never a header: the proxy answered plain JSON labelled gzip for a week in 2026-11 while an OPTIONS probe said fine). The Connect-agent wizard's **Test the connection** runs the same probe with the new key; the nightly MCP regression asks every site in the repo variable `MCP_PROBE_SITES` at its `/mcp` (no key — the JSON refusal is the proof).
 
 The system has 600+ skills. Exposing all of them as individual MCP tools floods a client's context. Three connection profiles control what a client sees (all via query params; default = unfiltered, kept for backward compat):
 
@@ -402,6 +402,13 @@ beside its payload, so an operator branches instead of guessing:
   badly in the platform goes upstream with `submit_feedback` (board bug):
   one report per defect per instance in 14 days (`ALREADY_REPORTED`), three a
   day for an unattended caller (`FEEDBACK_DAILY_CAP`), refusals both.
+- **The agent's day (2026-11-04).** `agent_activity.api_key_id` names the
+  connected agent behind every MCP call (set in `logActivity`, backfilled from
+  `input._caller_api_key_id`); `agent_day(p_peer_id, p_since)` answers calls,
+  outcomes, skills, reports published and the steps — an admin or the agent's
+  owner, never anon — behind **Activity** on the Agents page and
+  `agent_day_report(agent, hours)` over MCP. `get_agent_trace` stays the
+  per-run decision log.
 - **`invite_colleague`** (platform, trust `approve`): an agent asks, a person
   approves under /admin/approvals, Supabase Auth mails the invitation and the
   functional role is granted on first sign-in. The edge function admits the
@@ -434,7 +441,7 @@ A rule is a template (`manage_reconciliation_rule` with
 **`publish_report` — Reports (2026-11-03)** — what an agent worked out, as a
 versioned page staff open at `/admin/reports/<slug>` (the wiki says how things
 are; a report what happened). Markdown with the AgentReports blocks (`::kpis`,
-`::note warn`, `::details`, ```` ```chart bar|stacked|line ````) or a sandboxed
+`::note warn`, `::details`, ```` ```chart bar|stacked|line|pie ````) or a sandboxed
 HTML page; `read_skill publish_report` carries the guide. A ```` ```live ```` block
 (`{skill, args, kpis|chart|table}`) fetches its figures when opened, as the
 reader (`read_only: true` — agent-execute refuses anything but a read,
