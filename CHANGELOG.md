@@ -10,6 +10,20 @@ Release process: [docs/operators/release-process.md](docs/operators/release-proc
 
 ### Security
 
+- **The method that should have caught it, repaired.** The weekly security
+  scan had been red since its first run (2026-10-26) on `npm audit`, before the
+  guardrails step ever ran, and nothing watched the workflow; the five tool
+  functions sat in the public-functions guard's known-debt list for 40 days
+  with a green badge beside them. Now the scan is two jobs (advisories and
+  guardrails — one never hides the other), the guardrails job runs EVERY
+  guardrail test instead of a hand list of nine (40 security-shaped guards were
+  outside it), and each job that fails opens or updates one issue (label
+  `security-red`) and closes it when green. The known-debt list carries a
+  clock: a name may stay `KNOWN_UNGATED` for 60 days, then the guard is red with
+  the two ways out named — gate it or prove it visitor-facing by design. A
+  CodeQL workflow (javascript-typescript, security-extended) runs on every PR
+  and weekly; it is one more reader, not the method — Deno's request sources
+  are not modelled there, which is why the repo's own guards exist.
 - **Outbound URLs are judged before they are fetched (SSRF, CWE-918).** An
   independent researcher (Riddhish Lichade) reported that `extract-pdf-text`,
   `web-scrape` and `browser-fetch` were reachable without a caller check and
@@ -34,6 +48,18 @@ Release process: [docs/operators/release-process.md](docs/operators/release-proc
   design; `OUTBOUND_FETCH_ALLOW_PRIVATE=true` lifts the address check for an
   intranet deployment. Guard `outbound-urls-are-public` holds the rule and scans
   every `fetch` of a caller-URL identifier. `SECURITY.md` is new.
+### Changed
+
+- **agent-execute's pipeline is importable.** The 20 500-line executor moved
+  from `agent-execute/index.ts` to `_shared/execute/core.ts` as
+  `handleAgentExecute(req)`, byte-identical but for the import prefixes and the
+  wrapper; `index.ts` is the HTTP door, `serve(handleAgentExecute)`. Nothing
+  behaves differently. It is the first step toward running a skill in-process
+  from the ReAct loop, the gateway and the dispatchers instead of over an HTTP
+  hop inside the same project (one invocation per tool call, not two; one auth
+  gate, not two). The 169 guards, scripts and docs that read the pipeline's
+  source read the new path; the edge type-check baseline carries the file under
+  its new name.
 
 ### Fixed
 
